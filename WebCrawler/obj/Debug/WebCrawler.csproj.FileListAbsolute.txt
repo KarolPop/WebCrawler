@@ -1,0 +1,2 @@
+C:\Users\Karol\Desktop\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.csprojAssemblyReference.cache
+C:\Users\Karol\Desktop\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.csproj.CoreCompileInputs.cache
