@@ -30,7 +30,7 @@ namespace WebCrawler
             htmlDocument.DocumentNode.ChildAttributes("section")
              .Where(node => node.GetAttributeValue("class", "").Equals("O90-product-list")).ToList();
 
-            foreach (var section in sections)
+            foreach (var section in sections.rows)
             {
 
                 var productCategory = new ProductCategory

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace WebCrawler
 {
-    class ProductCategory
+    class ProductCategory 
     {
         public string MainCategory { get; set; }
         public string SubCategory { get; set; }
