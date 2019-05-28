@@ -1,17 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using MoreLinq;
 using HtmlAgilityPack;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
 using System.IO;
+using System.Diagnostics;
+using System.Collections.Async;
+using System.Collections.Concurrent;
 
 namespace WebCrawler
 {
     class Program
     {
+        static BlockingCollection<ProductLog> Logs = new BlockingCollection<ProductLog>();
+        static string FileWritePath = @"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\WriteText.csv";
         static void Main(string[] args)
         {
             startCrawlerAsync().Wait();
@@ -26,87 +32,85 @@ namespace WebCrawler
 
         private static async Task startCrawlerAsync()
         {
-                string[] urls = File.ReadAllLines(@"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\rw_sites.txt");
+            string[] brandsUrls = File.ReadAllLines(@"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\rw_sites.txt");
 
+            var tasks = new Task[] {
+                Task.Run(() => CheckSites(brandsUrls)),
+                Task.Run(() => LogStatuses())
+            };
 
-            //var httpClient = new HttpClient();
+            Task.WaitAll();
 
-            foreach (string value in urls)
-                {
+        }
 
-                    int index = value.IndexOf('/', 10);
-                    string origin = value.Substring(0, index);
-                    var httpClient = new HttpClient();
-                    var html = await httpClient.GetStringAsync(value);
-
-                    var htmlDocument = new HtmlDocument();
-                    htmlDocument.LoadHtml(html);
-
-
-                    //a list to add all the list of ROCKWOOL category products with all products
-                    var productCategories = new List<ProductCategory>();
-                    List<HtmlNode> productSections =
-                    htmlDocument.DocumentNode.Descendants("section")
-                        .Where(node => node.GetAttributeValue("class", "").Equals("O90-product-list")).ToList();
-
-                    System.IO.File.WriteAllText(@"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\WriteText.txt", "");
-                
-
-                    foreach (HtmlNode section in productSections)
-                    {
-                        List<HtmlNode> categoryNames = section.Descendants("h3").ToList();
-                        foreach (HtmlNode categoryName in categoryNames)
-                        {
-                            string category = categoryName.InnerText;
-                            Console.WriteLine("Product category name :" + ClearString(category) + $" site:{origin}");
-                            System.IO.File.AppendAllText(@"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\WriteText.txt", ClearString(category) + Environment.NewLine);
-
-
-                            List<HtmlNode> products = section.Descendants("li").ToList();
-                            foreach (HtmlNode product in products)
-                            {
-                                if (String.IsNullOrWhiteSpace(product.InnerText))
-                                    continue;
-
-                                var a = product.ChildNodes["a"];
-                                string productName = product.InnerText;
-                                var uri = new Uri($"{origin}{a.Attributes["href"].Value}");
-                                var productResponse = await httpClient.GetAsync(uri);
-
-                                //if (productResponse.IsSuccessStatusCode == false)
-                                //{
-                                //log unsuccessful request to product
-                                Console.WriteLine ($"{ClearString(productName)} ({uri}): {productResponse.StatusCode}: {DateTime.Now:yyyy-MM-dd hh-mm-ss}");
-                                //}
-
-                                //Console.WriteLine("Product name :" + ClearString(productName));
-                                System.IO.File.AppendAllText(@"C:\Users\karpo\OneDrive - ROCKWOOL Group\Desktop\WriteText.txt", ClearString(productName) + Environment.NewLine);
-                            }
-                        }
-                
-                        // var catName = section.Descendants("h3").Single().GetAttributeValue()
-
-                        /*
-                        ProductCategory productCategory = new ProductCategory
-                        {
-
-                            MainCategory = section.Descendants("h3").FirstOrDefault()?.InnerText,
-                            SubCategory = section.Descendants("h3").FirstOrDefault()?.InnerText,//.GetAttributeValue("class", "").Equals("O90-1-product-sublist__category__headline").InnerText,
-                            ProductName = section.Descendants("li").FirstOrDefault()?.InnerText,//.GetAttributeValue("class", "").Equals("O90-1-product-sublist__category__section__item").InnerText,
-                            ProductUrl = section.Descendants("a").FirstOrDefault()?.ChildAttributes("href").FirstOrDefault().Value
-                        };
-               
-                        productCategories.Add(productCategory);
-                        */
-
-                        var pr = await httpClient.GetAsync(new Uri($"https://www.rockwool.pl/dupa"));
-
-                        //if (productResponse.IsSuccessStatusCode == false)
-                        //{
-                        //log unsuccessful request to product
-                        Console.WriteLine($"Failed: {pr.StatusCode}");
-                    }
+        private static void LogStatuses()
+        {
+            foreach(var log in Logs.GetConsumingEnumerable())
+            {
+                System.IO.File.AppendAllText(FileWritePath, $"{log.BrandUrl},{log.Name},{log.Status}{Environment.NewLine}");
             }
+        }
+
+        private static async Task CheckSites(string[] brandsUrls)
+        {
+            foreach (string brandUrl in brandsUrls)
+            {
+                Stopwatch sw = new Stopwatch();
+                sw.Start();
+
+                await CheckProductsForBrand(brandUrl);
+
+                sw.Stop();
+                Console.WriteLine($"Done {sw.Elapsed}");
+
+                Logs.CompleteAdding();
+            }
+        }
+
+        private static async Task CheckProductsForBrand(string brandUrl)
+        {
+            int index = brandUrl.IndexOf('/', 10);
+            string origin = brandUrl.Substring(0, index);
+            var httpClient = new HttpClient();
+            var html = await httpClient.GetStringAsync(brandUrl);
+
+            var htmlDocument = new HtmlDocument();
+            htmlDocument.LoadHtml(html);
+
+            List<Product> products =
+            htmlDocument.DocumentNode.Descendants("li")
+                .AsParallel()
+                .Where(node => node.GetAttributeValue("class", "").Equals("O90-1-product-sublist__category__section__item") && node.InnerHtml != null)
+                .Select(x => MapToProduct(x, origin))
+                .DistinctBy(x => x.Url).ToList();
+
+            System.IO.File.WriteAllText(FileWritePath, $"Brand url,Product Name,Status{Environment.NewLine}");
+
+
+            await products.ParallelForEachAsync(async product =>
+            {
+                var productResponse = await httpClient.GetAsync(product.Url);
+                Console.WriteLine($"{product.Name} - {productResponse.StatusCode}");
+                Logs.Add(new ProductLog
+                {
+                    Name = product.Name,
+                    Status = productResponse?.StatusCode.ToString(),
+                    BrandUrl = brandUrl
+                });
+            });
+        }
+
+        private static Product MapToProduct(HtmlNode node, string origin)
+        {
+            var a = node.ChildNodes["a"];
+            string productName = ClearString(node.InnerText);
+            var uri = new Uri($"{origin}{a.Attributes["href"].Value}");
+
+            return new Product
+            {
+                Name = productName,
+                Url = uri
+            };
         }
     }
 }

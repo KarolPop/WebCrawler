@@ -16,3 +16,10 @@ C:\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.csprojAssemblyReference.c
 C:\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.csproj.CopyComplete
 C:\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.exe
 C:\Projects\WebCrawler\WebCrawler\obj\Debug\WebCrawler.pdb
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\MoreLinq.dll
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\System.ValueTuple.dll
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\MoreLinq.pdb
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\MoreLinq.xml
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\System.ValueTuple.xml
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\AsyncEnumerable.dll
+C:\Projects\WebCrawler\WebCrawler\bin\Debug\AsyncEnumerable.xml
